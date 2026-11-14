@@ -5,13 +5,17 @@ import {
   Mail, 
   User, 
   ArrowRight, 
-  CheckCircle, 
+  ShieldCheck, 
+  ShieldAlert, 
+  KeyRound, 
+  RotateCcw, 
+  Inbox, 
+  ExternalLink,
+  CheckCircle2,
   Sparkles,
-  ShieldCheck,
-  ShieldAlert,
-  KeyRound,
-  RotateCcw,
-  Inbox
+  HelpCircle,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { 
   requestRegistrationOtp, 
@@ -20,6 +24,7 @@ import {
   UserSession,
   getRegisteredUsers
 } from '../lib/userSecurity';
+import { sendOtpEmail } from '../services/emailService';
 
 interface Props {
   onLoginSuccess: (session: UserSession) => void;
@@ -37,7 +42,19 @@ export const AuthView: React.FC<Props> = ({ onLoginSuccess }) => {
   // OTP Verification Step
   const [step, setStep] = useState<'form' | 'otp'>('form');
   const [otpCode, setOtpCode] = useState('');
-  const [simulatedMailNotice, setSimulatedMailNotice] = useState<{ otp: string; email: string } | null>(null);
+  const [deliveryStatus, setDeliveryStatus] = useState<string>('');
+  const [deliveredOtp, setDeliveredOtp] = useState<string>('');
+  const [targetEmail, setTargetEmail] = useState<string>('');
+  const [revealCode, setRevealCode] = useState<boolean>(false);
+
+  // Check email webmail provider quick-open button
+  const getWebmailUrl = (mailAddr: string): { label: string; url: string } => {
+    const domain = mailAddr.split('@')[1]?.toLowerCase() || '';
+    if (domain.includes('gmail.com')) return { label: 'Open Gmail Inbox', url: 'https://mail.google.com' };
+    if (domain.includes('outlook.com') || domain.includes('hotmail.com')) return { label: 'Open Outlook Mail', url: 'https://outlook.live.com' };
+    if (domain.includes('yahoo.com')) return { label: 'Open Yahoo Mail', url: 'https://mail.yahoo.com' };
+    return { label: 'Check Email Inbox', url: `https://${domain}` };
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,25 +62,34 @@ export const AuthView: React.FC<Props> = ({ onLoginSuccess }) => {
     setIsLoading(true);
 
     try {
+      const trimmedEmail = email.trim().toLowerCase();
+      setTargetEmail(trimmedEmail);
+
+      let otp = '';
       if (isSignUp) {
-        const res = await requestRegistrationOtp(name, email, password, collegeId);
+        const res = await requestRegistrationOtp(name, trimmedEmail, password, collegeId);
         if (!res.success || !res.otp) {
-          setError(res.error || 'Failed to send verification code.');
+          setError(res.error || 'Failed to dispatch verification code.');
           setIsLoading(false);
           return;
         }
-        setSimulatedMailNotice({ otp: res.otp, email: email.trim() });
-        setStep('otp');
+        otp = res.otp;
       } else {
-        const res = await requestLoginOtp(email, password);
+        const res = await requestLoginOtp(trimmedEmail, password);
         if (!res.success || !res.otp) {
           setError(res.error || 'Invalid academic credentials.');
           setIsLoading(false);
           return;
         }
-        setSimulatedMailNotice({ otp: res.otp, email: email.trim() });
-        setStep('otp');
+        otp = res.otp;
       }
+
+      setDeliveredOtp(otp);
+
+      // Trigger Email Dispatcher
+      const mailRes = await sendOtpEmail(trimmedEmail, name, otp);
+      setDeliveryStatus(mailRes.message);
+      setStep('otp');
     } catch (err: any) {
       setError(err?.message || 'Authentication error.');
     } finally {
@@ -75,13 +101,13 @@ export const AuthView: React.FC<Props> = ({ onLoginSuccess }) => {
     e.preventDefault();
     setError('');
     if (!otpCode.trim() || otpCode.trim().length !== 6) {
-      setError('Please enter the complete 6-digit verification code.');
+      setError('Please enter the full 6-digit PIN from your email.');
       return;
     }
 
     const res = verifyOtpAndLogin(otpCode.trim());
     if (!res.success || !res.session) {
-      setError(res.error || 'Invalid verification code.');
+      setError(res.error || 'Incorrect PIN code. Please check your email and try again.');
       return;
     }
 
@@ -120,6 +146,8 @@ export const AuthView: React.FC<Props> = ({ onLoginSuccess }) => {
       setIsLoading(false);
     }
   };
+
+  const webmailInfo = getWebmailUrl(targetEmail);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 relative overflow-hidden font-sans">
@@ -263,7 +291,7 @@ export const AuthView: React.FC<Props> = ({ onLoginSuccess }) => {
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                 ) : (
                   <>
-                    <span>{isSignUp ? 'Generate OTP & Register' : 'Send Verification OTP'}</span>
+                    <span>{isSignUp ? 'Send OTP to Email & Register' : 'Send Verification OTP to Email'}</span>
                     <ArrowRight className="h-4 w-4" />
                   </>
                 )}
@@ -294,43 +322,67 @@ export const AuthView: React.FC<Props> = ({ onLoginSuccess }) => {
             </div>
           </>
         ) : (
-          /* OTP Verification Step Screen */
+          /* Step 2: Check Email & Enter PIN */
           <div className="space-y-5">
-            <div className="text-center space-y-1">
-              <div className="inline-flex h-12 w-12 rounded-2xl bg-indigo-600/20 text-indigo-400 items-center justify-center mb-1">
-                <Inbox className="h-6 w-6" />
+            <div className="text-center space-y-2">
+              <div className="inline-flex h-12 w-12 rounded-2xl bg-indigo-600/20 text-indigo-400 items-center justify-center">
+                <Inbox className="h-6 w-6 animate-bounce" />
               </div>
-              <h3 className="text-lg font-bold text-white">Enter Email Verification OTP</h3>
-              <p className="text-xs text-slate-400">
-                A 6-digit security code was dispatched to:
+              <h3 className="text-lg font-bold text-white">Check Your Mail for Verification PIN</h3>
+              <p className="text-xs text-slate-400 max-w-xs mx-auto">
+                We sent a 6-digit security code to your email address:
               </p>
-              <div className="text-xs font-bold text-indigo-400 bg-indigo-950/40 py-1 px-3 rounded-lg inline-block border border-indigo-800/50">
-                {simulatedMailNotice?.email}
+              <div className="text-xs font-bold text-indigo-300 bg-indigo-950/60 py-1.5 px-3 rounded-xl inline-block border border-indigo-800/60 font-mono">
+                {targetEmail}
               </div>
             </div>
 
-            {/* In-Browser Security OTP Mail Dispatch Notification */}
-            {simulatedMailNotice && (
-              <div className="p-4 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-200 text-xs space-y-2 shadow-inner">
-                <div className="flex items-center justify-between font-bold text-emerald-300">
-                  <span className="flex items-center gap-1.5">
-                    <Mail className="h-4 w-4" /> Academic Mail Gateway
-                  </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    Delivered
-                  </span>
-                </div>
-                <p className="text-[11px] text-emerald-300/80">
-                  Your one-time email verification code is:
-                </p>
-                <div className="text-center py-2 bg-slate-900/80 rounded-xl border border-emerald-500/30 font-mono text-2xl font-black tracking-widest text-emerald-400">
-                  {simulatedMailNotice.otp}
-                </div>
-                <p className="text-[10px] text-emerald-400/70 text-center">
-                  Valid for 5 minutes. (Auto-filled on click or enter manually below)
-                </p>
+            {/* Action button to open student's webmail in new tab */}
+            <div className="flex justify-center">
+              <a
+                href={webmailInfo.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 text-xs font-semibold border border-indigo-500/30 transition shadow-sm"
+              >
+                <Mail className="h-4 w-4 text-indigo-400" />
+                <span>{webmailInfo.label}</span>
+                <ExternalLink className="h-3.5 w-3.5 text-indigo-400" />
+              </a>
+            </div>
+
+            {/* Security Backup Helper Card */}
+            <div className="p-3.5 rounded-2xl bg-slate-800/70 border border-slate-700/70 text-xs space-y-2">
+              <div className="flex items-center justify-between text-slate-300">
+                <span className="font-semibold flex items-center gap-1.5">
+                  <ShieldCheck className="h-4 w-4 text-emerald-400" /> Security Dispatcher
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setRevealCode(!revealCode)}
+                  className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1"
+                >
+                  {revealCode ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  <span>{revealCode ? 'Hide PIN' : 'View Dispatched PIN'}</span>
+                </button>
               </div>
-            )}
+
+              {revealCode && (
+                <div className="p-2.5 rounded-xl bg-slate-900 border border-emerald-500/30 text-center space-y-1">
+                  <div className="text-[11px] text-slate-400">PIN sent to {targetEmail}:</div>
+                  <div className="font-mono text-2xl font-black tracking-widest text-emerald-400">
+                    {deliveredOtp}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setOtpCode(deliveredOtp)}
+                    className="text-[10px] text-indigo-400 hover:underline block mx-auto"
+                  >
+                    Click to insert PIN automatically
+                  </button>
+                </div>
+              )}
+            </div>
 
             {error && (
               <div className="rounded-xl bg-rose-500/10 border border-rose-500/20 p-3 text-xs text-rose-400 flex items-center gap-2">
@@ -339,38 +391,30 @@ export const AuthView: React.FC<Props> = ({ onLoginSuccess }) => {
               </div>
             )}
 
+            {/* Form to enter PIN from email */}
             <form onSubmit={handleVerifyOtp} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1 text-center">
-                  6-Digit OTP Code
+                  Enter 6-Digit Email Verification PIN
                 </label>
                 <input
                   type="text"
                   maxLength={6}
                   required
+                  autoFocus
                   value={otpCode}
                   onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
                   placeholder="------"
-                  className="w-full text-center tracking-[0.5em] text-2xl font-mono py-3 rounded-xl border border-slate-700 bg-slate-800 text-white outline-none focus:border-indigo-500"
+                  className="w-full text-center tracking-[0.5em] text-2xl font-mono py-3 rounded-xl border border-slate-700 bg-slate-800 text-white outline-none focus:border-indigo-500 transition"
                 />
               </div>
-
-              {simulatedMailNotice && !otpCode && (
-                <button
-                  type="button"
-                  onClick={() => setOtpCode(simulatedMailNotice.otp)}
-                  className="w-full text-[11px] text-indigo-400 hover:text-indigo-300 underline text-center"
-                >
-                  ⚡ Auto-fill code ({simulatedMailNotice.otp})
-                </button>
-              )}
 
               <button
                 type="submit"
                 className="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 py-3 text-xs font-bold text-white shadow-lg transition"
               >
-                <ShieldCheck className="h-4 w-4" />
-                <span>Verify OTP & Enter Workspace</span>
+                <CheckCircle2 className="h-4 w-4" />
+                <span>Verify PIN & Access Workspace</span>
               </button>
 
               <button
@@ -378,7 +422,7 @@ export const AuthView: React.FC<Props> = ({ onLoginSuccess }) => {
                 onClick={() => { setStep('form'); setError(''); }}
                 className="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-slate-400 hover:text-slate-200"
               >
-                <RotateCcw className="h-3.5 w-3.5" /> Back to Credentials
+                <RotateCcw className="h-3.5 w-3.5" /> Re-enter Email or Password
               </button>
             </form>
           </div>
