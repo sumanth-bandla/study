@@ -14,8 +14,8 @@ import {
   CheckCircle2,
   Sparkles,
   HelpCircle,
-  Eye,
-  EyeOff
+  Copy,
+  Info
 } from 'lucide-react';
 import { 
   requestRegistrationOtp, 
@@ -42,10 +42,9 @@ export const AuthView: React.FC<Props> = ({ onLoginSuccess }) => {
   // OTP Verification Step
   const [step, setStep] = useState<'form' | 'otp'>('form');
   const [otpCode, setOtpCode] = useState('');
-  const [deliveryStatus, setDeliveryStatus] = useState<string>('');
   const [deliveredOtp, setDeliveredOtp] = useState<string>('');
   const [targetEmail, setTargetEmail] = useState<string>('');
-  const [revealCode, setRevealCode] = useState<boolean>(false);
+  const [copied, setCopied] = useState<boolean>(false);
 
   // Check email webmail provider quick-open button
   const getWebmailUrl = (mailAddr: string): { label: string; url: string } => {
@@ -87,8 +86,7 @@ export const AuthView: React.FC<Props> = ({ onLoginSuccess }) => {
       setDeliveredOtp(otp);
 
       // Trigger Email Dispatcher
-      const mailRes = await sendOtpEmail(trimmedEmail, name, otp);
-      setDeliveryStatus(mailRes.message);
+      await sendOtpEmail(trimmedEmail, name, otp);
       setStep('otp');
     } catch (err: any) {
       setError(err?.message || 'Authentication error.');
@@ -101,17 +99,24 @@ export const AuthView: React.FC<Props> = ({ onLoginSuccess }) => {
     e.preventDefault();
     setError('');
     if (!otpCode.trim() || otpCode.trim().length !== 6) {
-      setError('Please enter the full 6-digit PIN from your email.');
+      setError('Please enter the full 6-digit PIN code.');
       return;
     }
 
     const res = verifyOtpAndLogin(otpCode.trim());
     if (!res.success || !res.session) {
-      setError(res.error || 'Incorrect PIN code. Please check your email and try again.');
+      setError(res.error || 'Incorrect PIN code. Please verify the code and try again.');
       return;
     }
 
     onLoginSuccess(res.session);
+  };
+
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(deliveredOtp);
+    setCopied(true);
+    setOtpCode(deliveredOtp);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   // Quick 1-Click Demo Profiles
@@ -330,58 +335,51 @@ export const AuthView: React.FC<Props> = ({ onLoginSuccess }) => {
               </div>
               <h3 className="text-lg font-bold text-white">Check Your Mail for Verification PIN</h3>
               <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                We sent a 6-digit security code to your email address:
+                We generated your 6-digit security PIN for:
               </p>
               <div className="text-xs font-bold text-indigo-300 bg-indigo-950/60 py-1.5 px-3 rounded-xl inline-block border border-indigo-800/60 font-mono">
                 {targetEmail}
               </div>
             </div>
 
-            {/* Action button to open student's webmail in new tab */}
-            <div className="flex justify-center">
-              <a
-                href={webmailInfo.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 text-xs font-semibold border border-indigo-500/30 transition shadow-sm"
-              >
-                <Mail className="h-4 w-4 text-indigo-400" />
-                <span>{webmailInfo.label}</span>
-                <ExternalLink className="h-3.5 w-3.5 text-indigo-400" />
-              </a>
-            </div>
-
-            {/* Security Backup Helper Card */}
-            <div className="p-3.5 rounded-2xl bg-slate-800/70 border border-slate-700/70 text-xs space-y-2">
-              <div className="flex items-center justify-between text-slate-300">
-                <span className="font-semibold flex items-center gap-1.5">
-                  <ShieldCheck className="h-4 w-4 text-emerald-400" /> Security Dispatcher
+            {/* Instant Verification Banner - Displays the PIN right here so you never get stuck */}
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/60 to-indigo-950/60 border border-emerald-500/40 text-xs space-y-2 shadow-lg">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-emerald-300 flex items-center gap-1.5">
+                  <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                  Verification Security PIN
                 </span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Ready
+                </span>
+              </div>
+              
+              <div className="flex items-center justify-between bg-slate-950/80 p-3 rounded-xl border border-emerald-500/30">
+                <div className="font-mono text-2xl font-black tracking-widest text-emerald-400">
+                  {deliveredOtp}
+                </div>
                 <button
                   type="button"
-                  onClick={() => setRevealCode(!revealCode)}
-                  className="text-[11px] text-slate-400 hover:text-white flex items-center gap-1"
+                  onClick={handleCopyCode}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] transition shadow"
                 >
-                  {revealCode ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                  <span>{revealCode ? 'Hide PIN' : 'View Dispatched PIN'}</span>
+                  <Copy className="h-3.5 w-3.5" />
+                  <span>{copied ? 'Copied & Filled!' : 'Auto-Fill PIN'}</span>
                 </button>
               </div>
 
-              {revealCode && (
-                <div className="p-2.5 rounded-xl bg-slate-900 border border-emerald-500/30 text-center space-y-1">
-                  <div className="text-[11px] text-slate-400">PIN sent to {targetEmail}:</div>
-                  <div className="font-mono text-2xl font-black tracking-widest text-emerald-400">
-                    {deliveredOtp}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setOtpCode(deliveredOtp)}
-                    className="text-[10px] text-indigo-400 hover:underline block mx-auto"
-                  >
-                    Click to insert PIN automatically
-                  </button>
-                </div>
-              )}
+              <div className="flex items-center justify-between pt-1">
+                <a
+                  href={webmailInfo.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] text-indigo-300 hover:text-white flex items-center gap-1 underline"
+                >
+                  <span>{webmailInfo.label}</span>
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+                <span className="text-[10px] text-slate-400">Valid for 5 minutes</span>
+              </div>
             </div>
 
             {error && (
@@ -391,7 +389,7 @@ export const AuthView: React.FC<Props> = ({ onLoginSuccess }) => {
               </div>
             )}
 
-            {/* Form to enter PIN from email */}
+            {/* Form to enter PIN */}
             <form onSubmit={handleVerifyOtp} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1 text-center">
@@ -405,7 +403,7 @@ export const AuthView: React.FC<Props> = ({ onLoginSuccess }) => {
                   value={otpCode}
                   onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
                   placeholder="------"
-                  className="w-full text-center tracking-[0.5em] text-2xl font-mono py-3 rounded-xl border border-slate-700 bg-slate-800 text-white outline-none focus:border-indigo-500 transition"
+                  className="w-full text-center tracking-[0.5em] text-2xl font-mono py-3 rounded-xl border border-slate-700 bg-slate-800 text-white outline-none focus:border-indigo-500 transition shadow-inner"
                 />
               </div>
 

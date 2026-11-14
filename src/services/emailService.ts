@@ -2,21 +2,25 @@ import emailjs from '@emailjs/browser';
 
 /**
  * Service to dispatch real 6-digit OTP verification emails.
- * Supports EmailJS service or configurable SMTP/Webhook relay,
- * plus a simulated webmail notification fallback.
+ * Supports:
+ * 1. Formspree / Webhook free zero-config mailer relay
+ * 2. EmailJS live client delivery
+ * 3. Fallback browser notification with instant auto-fill
  */
 
 export interface EmailDispatchConfig {
   serviceId?: string;
   templateId?: string;
   publicKey?: string;
+  endpointUrl?: string;
 }
 
 export const getEmailConfig = (): EmailDispatchConfig => {
   return {
     serviceId: (import.meta as any).env?.VITE_EMAILJS_SERVICE_ID || localStorage.getItem('STUDYHUB_EMAILJS_SERVICE_ID') || '',
     templateId: (import.meta as any).env?.VITE_EMAILJS_TEMPLATE_ID || localStorage.getItem('STUDYHUB_EMAILJS_TEMPLATE_ID') || '',
-    publicKey: (import.meta as any).env?.VITE_EMAILJS_PUBLIC_KEY || localStorage.getItem('STUDYHUB_EMAILJS_PUBLIC_KEY') || ''
+    publicKey: (import.meta as any).env?.VITE_EMAILJS_PUBLIC_KEY || localStorage.getItem('STUDYHUB_EMAILJS_PUBLIC_KEY') || '',
+    endpointUrl: (import.meta as any).env?.VITE_MAIL_ENDPOINT_URL || localStorage.getItem('STUDYHUB_MAIL_ENDPOINT') || ''
   };
 };
 
@@ -24,6 +28,7 @@ export const saveEmailConfig = (config: EmailDispatchConfig) => {
   if (config.serviceId) localStorage.setItem('STUDYHUB_EMAILJS_SERVICE_ID', config.serviceId.trim());
   if (config.templateId) localStorage.setItem('STUDYHUB_EMAILJS_TEMPLATE_ID', config.templateId.trim());
   if (config.publicKey) localStorage.setItem('STUDYHUB_EMAILJS_PUBLIC_KEY', config.publicKey.trim());
+  if (config.endpointUrl) localStorage.setItem('STUDYHUB_MAIL_ENDPOINT', config.endpointUrl.trim());
 };
 
 export const sendOtpEmail = async (
@@ -33,7 +38,32 @@ export const sendOtpEmail = async (
 ): Promise<{ sentRealMail: boolean; message: string }> => {
   const config = getEmailConfig();
 
-  // If EmailJS credentials are provided, send a real live email to the student's actual inbox
+  // 1. Try Custom Webhook / Serverless API Relay if configured
+  if (config.endpointUrl) {
+    try {
+      const res = await fetch(config.endpointUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: recipientEmail,
+          name: recipientName || 'Student',
+          subject: `Your STUDYHUB AI Verification Code is ${otpCode}`,
+          otp: otpCode,
+          time: new Date().toLocaleTimeString()
+        })
+      });
+      if (res.ok) {
+        return {
+          sentRealMail: true,
+          message: `Verification PIN has been delivered to ${recipientEmail}. Check your inbox or spam folder!`
+        };
+      }
+    } catch (e) {
+      console.warn('Custom mail endpoint delivery note:', e);
+    }
+  }
+
+  // 2. Try EmailJS client-side delivery if configured
   if (config.serviceId && config.templateId && config.publicKey) {
     try {
       await emailjs.send(
@@ -50,16 +80,16 @@ export const sendOtpEmail = async (
       );
       return {
         sentRealMail: true,
-        message: `A real verification PIN has been dispatched to ${recipientEmail}. Please check your inbox or spam folder.`
+        message: `Real verification PIN delivered to ${recipientEmail}. Please check your inbox or spam folder.`
       };
     } catch (err: any) {
       console.warn('EmailJS transmission note:', err);
     }
   }
 
-  // Fallback: If live credentials are not yet entered in settings, provide simulated email dispatcher
+  // 3. Built-in instant fallback: Show security banner with copyable PIN
   return {
     sentRealMail: false,
-    message: `Security verification PIN generated for ${recipientEmail}.`
+    message: `Verification PIN for ${recipientEmail}: ${otpCode}`
   };
 };
