@@ -197,7 +197,7 @@ export const AuthView: React.FC<Props> = ({ onLoginSuccess }) => {
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder="e.g. Sumanth Bandla"
+                      placeholder="Enter your full name"
                       className="w-full text-xs pl-10 pr-3.5 py-2.5 rounded-xl border border-slate-700 bg-slate-800/70 text-white placeholder:text-slate-500 outline-none focus:border-indigo-500 transition"
                     />
                   </div>
@@ -277,11 +277,11 @@ export const AuthView: React.FC<Props> = ({ onLoginSuccess }) => {
               </p>
               <div className="grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => handleQuickDemo('Sumanth Bandla', 'sumanth@student.edu')}
+                  onClick={() => handleQuickDemo('Senior Scholar', 'scholar@student.edu')}
                   className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700/80 text-xs font-semibold text-slate-200 border border-slate-700/60 transition"
                 >
                   <Sparkles className="h-3.5 w-3.5 text-amber-400" />
-                  <span>Sumanth (Demo)</span>
+                  <span>Senior Scholar</span>
                 </button>
                 <button
                   onClick={() => handleQuickDemo('Alex Rivera', 'alex@university.edu')}
