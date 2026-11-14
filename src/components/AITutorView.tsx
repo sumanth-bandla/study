@@ -25,6 +25,72 @@ export const AITutorView: React.FC = () => {
   const [quizData, setQuizData] = useState<any[] | null>(null);
   const [userAnswers, setUserAnswers] = useState<{ [qIdx: number]: number }>({});
   const [quizSubmitted, setQuizSubmitted] = useState(false);
+  // Real-time Voice & Audio Tutor State
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+
+  // Toggle Text-to-Speech reading of AI explanation
+  const toggleSpeech = () => {
+    if (!('speechSynthesis' in window)) {
+      alert('Speech synthesis is not supported on this browser.');
+      return;
+    }
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+    if (!aiOutput) return;
+
+    window.speechSynthesis.cancel();
+    // Strip markdown formatting for cleaner audio narration
+    const cleanSpeech = aiOutput
+      .replace(/[*#`_~>-]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const utterance = new SpeechSynthesisUtterance(cleanSpeech);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    setIsSpeaking(true);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // Toggle Speech-to-Text Voice Query asking
+  const toggleListening = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Speech Recognition is not supported on this browser (Chrome / Edge recommended).');
+      return;
+    }
+
+    if (isListening) {
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => setIsListening(true);
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setCustomPrompt(prev => (prev ? prev + ' ' + transcript : transcript));
+        setIsListening(false);
+      };
+      recognition.onerror = () => setIsListening(false);
+      recognition.onend = () => setIsListening(false);
+      recognition.start();
+    } catch (err) {
+      setIsListening(false);
+    }
+  };
+
 
   const currentSubject = subjects.find(s => s.id === selectedSubjectId);
   const currentUnit = currentSubject?.units.find(u => u.id === selectedUnitId);

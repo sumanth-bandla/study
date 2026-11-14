@@ -9,8 +9,16 @@ import { ExamPrepView } from './components/ExamPrepView';
 import { RevisionView } from './components/RevisionView';
 import { BacklogView } from './components/BacklogView';
 import { AnalyticsView } from './components/AnalyticsView';
+import { RealtimeStudyRoomView } from './components/RealtimeStudyRoomView';
+import { SettingsView } from './components/SettingsView';
 import { StudyTimerModal } from './components/StudyTimerModal';
+import { AuthView } from './components/AuthView';
 import { downloadBackupFile } from './lib/accidentalLossGuard';
+import { 
+  UserSession, 
+  getActiveSession, 
+  terminateSession 
+} from './lib/userSecurity';
 import { 
   LayoutDashboard, 
   BookOpen, 
@@ -24,12 +32,16 @@ import {
   Sun, 
   Moon, 
   Clock, 
-  Download,
-  Menu,
-  X
+  Download, 
+  Menu, 
+  X, 
+  Users, 
+  LogOut, 
+  ShieldCheck,
+  Settings as SettingsIcon
 } from 'lucide-react';
 
-const MainLayout: React.FC = () => {
+const MainLayout: React.FC<{ session: UserSession; onLogout: () => void }> = ({ session, onLogout }) => {
   const { theme, toggleTheme, subjects } = useApp();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isTimerOpen, setIsTimerOpen] = useState(false);
@@ -37,6 +49,7 @@ const MainLayout: React.FC = () => {
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'realtime_room', label: 'Live Study Lounge', icon: Users, badge: 'Live Realtime' },
     { id: 'subjects', label: 'Subjects (5 Units)', icon: BookOpen },
     { id: 'planner', label: 'Smart Planner', icon: CalendarDays },
     { id: 'ai_tutor', label: 'AI Study Tutor', icon: Sparkles, badge: 'Gemini' },
@@ -44,7 +57,8 @@ const MainLayout: React.FC = () => {
     { id: 'exam_prep', label: 'Exam Prep & PYQ', icon: GraduationCap },
     { id: 'revisions', label: 'Spaced Revision', icon: RotateCcw },
     { id: 'backlogs', label: 'Backlog Tracker', icon: AlertOctagon },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 }
+    { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+    { id: 'settings', label: 'Settings', icon: SettingsIcon }
   ];
 
   return (
@@ -61,6 +75,9 @@ const MainLayout: React.FC = () => {
           <button onClick={toggleTheme} className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">
             {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </button>
+          <button onClick={onLogout} className="p-2 rounded-lg text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40" title="Log out">
+            <LogOut className="h-5 w-5" />
+          </button>
           <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 rounded-lg text-slate-500">
             {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
@@ -70,28 +87,28 @@ const MainLayout: React.FC = () => {
       {/* Sidebar Navigation */}
       <aside className={`fixed inset-y-0 left-0 z-40 w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 flex flex-col justify-between transition-transform duration-300 md:static md:translate-x-0 ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div>
-          {/* Logo */}
+          {/* Logo & User Badge */}
           <div className="flex items-center gap-2.5 px-3 py-2">
             <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center text-white font-extrabold text-base shadow-md">
               SH
             </div>
-            <div>
-              <div className="font-extrabold text-sm tracking-tight leading-none text-slate-900 dark:text-white">
+            <div className="min-w-0 flex-1">
+              <div className="font-extrabold text-sm tracking-tight leading-none text-slate-900 dark:text-white truncate">
                 STUDYHUB AI
               </div>
-              <div className="text-[10px] text-indigo-500 font-semibold tracking-wider uppercase mt-1">
-                B.Tech Smart Study
+              <div className="text-[10px] text-emerald-500 font-bold flex items-center gap-1 tracking-wider uppercase mt-1 truncate">
+                <ShieldCheck className="h-3 w-3" /> {session.name}
               </div>
             </div>
           </div>
 
-          {/* Quick Focus Study Timer Button */}
+          {/* Quick Focus Study & Break Timer Button */}
           <div className="mt-5 px-1">
             <button
               onClick={() => { setIsTimerOpen(true); setMobileMenuOpen(false); }}
               className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 py-2.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 transition shadow-sm"
             >
-              <Clock className="h-4 w-4" /> Focus Study Timer
+              <Clock className="h-4 w-4" /> Focus & Break Timer
             </button>
           </div>
 
@@ -115,7 +132,11 @@ const MainLayout: React.FC = () => {
                     <span>{item.label}</span>
                   </div>
                   {item.badge && (
-                    <span className="rounded-full bg-amber-400/20 text-amber-500 dark:text-amber-300 text-[10px] px-2 py-0.5 font-bold">
+                    <span className={`rounded-full text-[10px] px-2 py-0.5 font-bold ${
+                      item.id === 'realtime_room'
+                        ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                        : 'bg-amber-400/20 text-amber-500 dark:text-amber-300'
+                    }`}>
                       {item.badge}
                     </span>
                   )}
@@ -128,10 +149,23 @@ const MainLayout: React.FC = () => {
         {/* Sidebar Footer */}
         <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2">
           <button
+            onClick={() => setActiveTab('settings')}
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition ${
+              activeTab === 'settings' 
+                ? 'bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 font-bold' 
+                : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <SettingsIcon className="h-3.5 w-3.5" /> Settings
+            </span>
+            <span className="text-[10px] text-slate-400">Account & AI</span>
+          </button>
+          <button
             onClick={() => downloadBackupFile(subjects)}
             className="w-full flex items-center justify-center gap-2 rounded-lg border border-slate-200 dark:border-slate-800 py-2 text-[11px] font-medium text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
           >
-            <Download className="h-3.5 w-3.5" /> Backup Academic Data (JSON)
+            <Download className="h-3.5 w-3.5" /> Backup User Data (JSON)
           </button>
           <button
             onClick={toggleTheme}
@@ -139,6 +173,15 @@ const MainLayout: React.FC = () => {
           >
             <span>Appearance</span>
             <span>{theme === 'dark' ? '🌙 Dark Mode' : '☀️ Light Mode'}</span>
+          </button>
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition"
+          >
+            <span className="flex items-center gap-2">
+              <LogOut className="h-3.5 w-3.5" /> Sign Out
+            </span>
+            <span className="text-[10px] text-slate-400 truncate max-w-[90px]">{session.email}</span>
           </button>
         </div>
       </aside>
@@ -148,6 +191,7 @@ const MainLayout: React.FC = () => {
         {activeTab === 'dashboard' && (
           <DashboardView onNavigate={setActiveTab} onOpenTimer={() => setIsTimerOpen(true)} />
         )}
+        {activeTab === 'realtime_room' && <RealtimeStudyRoomView />}
         {activeTab === 'subjects' && <SubjectsView />}
         {activeTab === 'planner' && <PlannerView onOpenTimer={() => setIsTimerOpen(true)} />}
         {activeTab === 'ai_tutor' && <AITutorView />}
@@ -156,18 +200,32 @@ const MainLayout: React.FC = () => {
         {activeTab === 'revisions' && <RevisionView />}
         {activeTab === 'backlogs' && <BacklogView />}
         {activeTab === 'analytics' && <AnalyticsView />}
+        {activeTab === 'settings' && <SettingsView session={session} />}
       </main>
 
-      {/* Study Timer Overlay Modal */}
+      {/* Study & Break Timer Overlay Modal */}
       <StudyTimerModal isOpen={isTimerOpen} onClose={() => setIsTimerOpen(false)} />
     </div>
   );
 };
 
 export default function App() {
+  const [session, setSession] = useState<UserSession | null>(() => {
+    return getActiveSession();
+  });
+
+  const handleLogout = () => {
+    terminateSession();
+    setSession(null);
+  };
+
+  if (!session) {
+    return <AuthView onLoginSuccess={setSession} />;
+  }
+
   return (
-    <AppProvider>
-      <MainLayout />
+    <AppProvider currentUserId={session.userId}>
+      <MainLayout session={session} onLogout={handleLogout} />
     </AppProvider>
   );
 }

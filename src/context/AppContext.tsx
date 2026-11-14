@@ -7,7 +7,7 @@ import {
   Exam, 
   RevisionItem, 
   Backlog, 
-  QuizResult,
+  QuizResult, 
   TimeSlot 
 } from '../types';
 import { 
@@ -18,8 +18,10 @@ import {
   INITIAL_EXAMS 
 } from '../data/initialData';
 import { createDataBackup } from '../lib/accidentalLossGuard';
+import { getUserStorageKey } from '../lib/userSecurity';
 
 interface AppContextType {
+  userId?: string;
   subjects: Subject[];
   tasks: DailyTask[];
   sessions: StudySession[];
@@ -69,28 +71,54 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AppProvider: React.FC<{ children: React.ReactNode; currentUserId?: string }> = ({ 
+  children, 
+  currentUserId = 'default_student' 
+}) => {
+  // Helper to get key either per-user or legacy fallback for the default user
+  const getKey = (dataKey: string) => {
+    return currentUserId ? getUserStorageKey(currentUserId, dataKey) : `STUDYHUB_${dataKey}`;
+  };
+
   const [subjects, setSubjects] = useState<Subject[]>(() => {
-    const saved = localStorage.getItem('STUDYHUB_SUBJECTS');
-    return saved ? JSON.parse(saved) : INITIAL_SUBJECTS;
+    const key = getKey('SUBJECTS');
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    // For legacy default student, load initial B.Tech demo curriculum.
+    // For a newly registered user, start with a pristine workspace!
+    return currentUserId === 'default_student' ? INITIAL_SUBJECTS : [];
   });
 
   const [tasks, setTasks] = useState<DailyTask[]>(() => {
-    const saved = localStorage.getItem('STUDYHUB_TASKS');
-    return saved ? JSON.parse(saved) : INITIAL_TASKS;
+    const key = getKey('TASKS');
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return currentUserId === 'default_student' ? INITIAL_TASKS : [];
   });
 
   const [sessions, setSessions] = useState<StudySession[]>(() => {
-    const saved = localStorage.getItem('STUDYHUB_SESSIONS');
-    return saved ? JSON.parse(saved) : [
+    const key = getKey('SESSIONS');
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return currentUserId === 'default_student' ? [
       { id: 's1', subjectId: 'sub-bda', date: new Date().toISOString().split('T')[0], durationMinutes: 75, slot: 'Morning', notesSummary: 'HDFS and NameNode high availability' },
       { id: 's2', subjectId: 'sub-sadp', date: new Date().toISOString().split('T')[0], durationMinutes: 50, slot: 'Afternoon', notesSummary: 'Design patterns in Java' }
-    ];
+    ] : [];
   });
 
   const [notes, setNotes] = useState<Note[]>(() => {
-    const saved = localStorage.getItem('STUDYHUB_NOTES');
-    return saved ? JSON.parse(saved) : [
+    const key = getKey('NOTES');
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return currentUserId === 'default_student' ? [
       {
         id: 'n1',
         subjectId: 'sub-bda',
@@ -99,37 +127,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         content: '# HDFS Architecture & Fault Tolerance\n\n- **NameNode**: Master node maintaining filesystem namespace, directory tree, and file block mappings.\n- **DataNodes**: Slave nodes that store actual block replicas (default 3x replication factor).\n- **Secondary NameNode**: Periodically checkpoints edit logs into fsimage; does NOT act as a live standby failover!\n- **ZooKeeper FailoverController (ZKFC)**: Used in production Hadoop clusters for automatic active-standby NameNode election.',
         updatedAt: new Date().toISOString(),
         tags: ['Hadoop', 'HDFS', 'Storage']
-      },
-      {
-        id: 'n2',
-        subjectId: 'sub-ads',
-        unitId: 'u-ads-1',
-        title: 'AVL Tree Rotation Summary & Height Balancing',
-        content: '# AVL Tree Rotations\n\nBalance Factor = Height(Left Subtree) - Height(Right Subtree)\nPermissible Balance Factors: -1, 0, +1.\n\n### 4 Rotation Types:\n1. **LL (Left of Left)**: Single Right Rotation.\n2. **RR (Right of Right)**: Single Left Rotation.\n3. **LR (Right of Left)**: Double Rotation (Left on child, then Right on root).\n4. **RL (Left of Right)**: Double Rotation (Right on child, then Left on root).\n\n*Time Complexity: Search, Insert, Delete all strictly O(log N).*',
-        updatedAt: new Date().toISOString(),
-        tags: ['Trees', 'AVL', 'Algorithms']
       }
-    ];
+    ] : [];
   });
 
   const [exams, setExams] = useState<Exam[]>(() => {
-    const saved = localStorage.getItem('STUDYHUB_EXAMS');
-    return saved ? JSON.parse(saved) : INITIAL_EXAMS;
+    const key = getKey('EXAMS');
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return currentUserId === 'default_student' ? INITIAL_EXAMS : [];
   });
 
   const [revisions, setRevisions] = useState<RevisionItem[]>(() => {
-    const saved = localStorage.getItem('STUDYHUB_REVISIONS');
-    return saved ? JSON.parse(saved) : INITIAL_REVISIONS;
+    const key = getKey('REVISIONS');
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return currentUserId === 'default_student' ? INITIAL_REVISIONS : [];
   });
 
   const [backlogs, setBacklogs] = useState<Backlog[]>(() => {
-    const saved = localStorage.getItem('STUDYHUB_BACKLOGS');
-    return saved ? JSON.parse(saved) : INITIAL_BACKLOGS;
+    const key = getKey('BACKLOGS');
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return currentUserId === 'default_student' ? INITIAL_BACKLOGS : [];
   });
 
   const [quizResults, setQuizResults] = useState<QuizResult[]>(() => {
-    const saved = localStorage.getItem('STUDYHUB_QUIZZES');
-    return saved ? JSON.parse(saved) : [];
+    const key = getKey('QUIZZES');
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return [];
   });
 
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -145,22 +180,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     elapsedSeconds: 0
   });
 
-  // Save to localStorage & auto shadow backup
+  // Save to isolated per-user localStorage & shadow backup
   useEffect(() => {
-    localStorage.setItem('STUDYHUB_SUBJECTS', JSON.stringify(subjects));
-    localStorage.setItem('STUDYHUB_TASKS', JSON.stringify(tasks));
-    localStorage.setItem('STUDYHUB_SESSIONS', JSON.stringify(sessions));
-    localStorage.setItem('STUDYHUB_NOTES', JSON.stringify(notes));
-    localStorage.setItem('STUDYHUB_EXAMS', JSON.stringify(exams));
-    localStorage.setItem('STUDYHUB_REVISIONS', JSON.stringify(revisions));
-    localStorage.setItem('STUDYHUB_BACKLOGS', JSON.stringify(backlogs));
-    localStorage.setItem('STUDYHUB_QUIZZES', JSON.stringify(quizResults));
+    localStorage.setItem(getKey('SUBJECTS'), JSON.stringify(subjects));
+    localStorage.setItem(getKey('TASKS'), JSON.stringify(tasks));
+    localStorage.setItem(getKey('SESSIONS'), JSON.stringify(sessions));
+    localStorage.setItem(getKey('NOTES'), JSON.stringify(notes));
+    localStorage.setItem(getKey('EXAMS'), JSON.stringify(exams));
+    localStorage.setItem(getKey('REVISIONS'), JSON.stringify(revisions));
+    localStorage.setItem(getKey('BACKLOGS'), JSON.stringify(backlogs));
+    localStorage.setItem(getKey('QUIZZES'), JSON.stringify(quizResults));
     localStorage.setItem('STUDYHUB_THEME', theme);
     localStorage.setItem('STUDYHUB_GEMINI_KEY', apiKey);
 
     // Continuous data backup snapshot
     createDataBackup({ subjects, tasks, sessions, notes, exams, revisions, backlogs });
-  }, [subjects, tasks, sessions, notes, exams, revisions, backlogs, quizResults, theme, apiKey]);
+  }, [subjects, tasks, sessions, notes, exams, revisions, backlogs, quizResults, theme, apiKey, currentUserId]);
 
   // Timer interval
   useEffect(() => {
@@ -173,20 +208,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => clearInterval(interval);
   }, [activeTimer.isRunning]);
 
-  const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  // Sync theme to root HTML element
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
 
-  // Subject CRUD
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
+
+  // SUBJECT & UNIT METHODS
   const addSubject = (sub: Omit<Subject, 'id' | 'units'>) => {
     const newSubject: Subject = {
       ...sub,
-      id: 'sub-' + Date.now(),
+      id: `sub_${Date.now()}`,
       units: [1, 2, 3, 4, 5].map(uNum => ({
-        id: `u-${Date.now()}-${uNum}`,
+        id: `u_${Date.now()}_${uNum}`,
         unitNumber: uNum,
-        title: `Unit ${uNum} - Core Syllabus`,
+        title: `Unit ${uNum}: Core Curriculum Topics`,
         completed: false,
         topics: [
-          { id: `t-${Date.now()}-${uNum}-1`, title: `Syllabus Overview & Fundamental Concepts`, completed: false }
+          { id: `top_${Date.now()}_${uNum}_1`, title: `Unit ${uNum} Essential Principle`, completed: false, isImportant: true },
+          { id: `top_${Date.now()}_${uNum}_2`, title: `Unit ${uNum} Architecture & Operations`, completed: false },
+          { id: `top_${Date.now()}_${uNum}_3`, title: `Unit ${uNum} University Problem Solving`, completed: false }
         ]
       }))
     };
@@ -202,17 +250,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleUnitCompletion = (subjectId: string, unitId: string) => {
-    setSubjects(prev => prev.map(sub => {
-      if (sub.id !== subjectId) return sub;
+    setSubjects(prev => prev.map(s => {
+      if (s.id !== subjectId) return s;
       return {
-        ...sub,
-        units: sub.units.map(unit => {
-          if (unit.id !== unitId) return unit;
-          const nextVal = !unit.completed;
+        ...s,
+        units: s.units.map(u => {
+          if (u.id !== unitId) return u;
+          const nextCompleted = !u.completed;
           return {
-            ...unit,
-            completed: nextVal,
-            topics: unit.topics.map(t => ({ ...t, completed: nextVal }))
+            ...u,
+            completed: nextCompleted,
+            topics: u.topics.map(t => ({ ...t, completed: nextCompleted }))
           };
         })
       };
@@ -220,50 +268,49 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const toggleTopicCompletion = (subjectId: string, unitId: string, topicId: string) => {
-    setSubjects(prev => prev.map(sub => {
-      if (sub.id !== subjectId) return sub;
+    setSubjects(prev => prev.map(s => {
+      if (s.id !== subjectId) return s;
       return {
-        ...sub,
-        units: sub.units.map(unit => {
-          if (unit.id !== unitId) return unit;
-          const nextTopics = unit.topics.map(t => t.id === topicId ? { ...t, completed: !t.completed } : t);
-          const allDone = nextTopics.length > 0 && nextTopics.every(t => t.completed);
+        ...s,
+        units: s.units.map(u => {
+          if (u.id !== unitId) return u;
+          const updatedTopics = u.topics.map(t => t.id === topicId ? { ...t, completed: !t.completed } : t);
+          const allTopicsDone = updatedTopics.every(t => t.completed);
           return {
-            ...unit,
-            completed: allDone,
-            topics: nextTopics
+            ...u,
+            topics: updatedTopics,
+            completed: allTopicsDone
           };
         })
       };
     }));
   };
 
-  const addTopic = (subjectId: string, unitId: string, title: string, isImportant = false) => {
-    setSubjects(prev => prev.map(sub => {
-      if (sub.id !== subjectId) return sub;
+  const addTopic = (subjectId: string, unitId: string, title: string, isImportant: boolean = false) => {
+    setSubjects(prev => prev.map(s => {
+      if (s.id !== subjectId) return s;
       return {
-        ...sub,
-        units: sub.units.map(unit => {
-          if (unit.id !== unitId) return unit;
+        ...s,
+        units: s.units.map(u => {
+          if (u.id !== unitId) return u;
           return {
-            ...unit,
-            completed: false,
-            topics: [...unit.topics, { id: 'top-' + Date.now(), title, completed: false, isImportant }]
+            ...u,
+            topics: [...u.topics, { id: `top_${Date.now()}`, title, completed: false, isImportant }]
           };
         })
       };
     }));
   };
 
-  // Task Actions
+  // TASK ACTIONS
   const addTask = (task: Omit<DailyTask, 'id' | 'completed' | 'rescheduledCount'>) => {
     const newTask: DailyTask = {
       ...task,
-      id: 'task-' + Date.now(),
+      id: `task_${Date.now()}`,
       completed: false,
       rescheduledCount: 0
     };
-    setTasks(prev => [newTask, ...prev]);
+    setTasks(prev => [...prev, newTask]);
   };
 
   const toggleTask = (id: string) => {
@@ -282,30 +329,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
 
-  const deleteTask = (id: string) => setTasks(prev => prev.filter(t => t.id !== id));
+  const deleteTask = (id: string) => {
+    setTasks(prev => prev.filter(t => t.id !== id));
+  };
 
-  // Notes
+  // NOTES
   const addNote = (note: Omit<Note, 'id' | 'updatedAt'>) => {
     const newNote: Note = {
       ...note,
-      id: 'note-' + Date.now(),
+      id: `note_${Date.now()}`,
       updatedAt: new Date().toISOString()
     };
     setNotes(prev => [newNote, ...prev]);
   };
 
   const updateNote = (id: string, content: string, title?: string) => {
-    setNotes(prev => prev.map(n => n.id === id ? { 
-      ...n, 
-      content, 
-      title: title || n.title, 
-      updatedAt: new Date().toISOString() 
-    } : n));
+    setNotes(prev => prev.map(n => {
+      if (n.id !== id) return n;
+      return {
+        ...n,
+        content,
+        title: title || n.title,
+        updatedAt: new Date().toISOString()
+      };
+    }));
   };
 
-  const deleteNote = (id: string) => setNotes(prev => prev.filter(n => n.id !== id));
+  const deleteNote = (id: string) => {
+    setNotes(prev => prev.filter(n => n.id !== id));
+  };
 
-  // Timer
+  // TIMER & SESSIONS
   const startTimer = (subjectId: string, unitId?: string) => {
     setActiveTimer({
       isRunning: true,
@@ -316,17 +370,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const pauseTimer = () => {
-    setActiveTimer(prev => ({ ...prev, isRunning: !prev.isRunning }));
+    setActiveTimer(prev => ({ ...prev, isRunning: false }));
   };
 
   const resetTimer = () => {
-    setActiveTimer({ isRunning: false, elapsedSeconds: 0 });
+    setActiveTimer({
+      isRunning: false,
+      elapsedSeconds: 0
+    });
   };
 
   const saveSession = (durationMinutes: number, slot: TimeSlot, notesSummary?: string) => {
     if (!activeTimer.subjectId) return;
     const newSession: StudySession = {
-      id: 'sess-' + Date.now(),
+      id: `session_${Date.now()}`,
       subjectId: activeTimer.subjectId,
       unitId: activeTimer.unitId,
       date: new Date().toISOString().split('T')[0],
@@ -338,49 +395,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     resetTimer();
   };
 
-  // Revisions
+  // REVISIONS
   const toggleRevisionDone = (revId: string, stage: 1 | 2 | 3) => {
     setRevisions(prev => prev.map(r => {
       if (r.id !== revId) return r;
       if (stage === 1) return { ...r, rev1Done: !r.rev1Done };
       if (stage === 2) return { ...r, rev2Done: !r.rev2Done };
-      return { ...r, rev3Done: !r.rev3Done };
+      if (stage === 3) return { ...r, rev3Done: !r.rev3Done };
+      return r;
     }));
   };
 
   const addRevisionItem = (item: Omit<RevisionItem, 'id' | 'rev1Done' | 'rev2Done' | 'rev3Done'>) => {
-    const newItem: RevisionItem = {
+    const newRev: RevisionItem = {
       ...item,
-      id: 'rev-' + Date.now(),
+      id: `rev_${Date.now()}`,
       rev1Done: false,
       rev2Done: false,
       rev3Done: false
     };
-    setRevisions(prev => [...prev, newItem]);
+    setRevisions(prev => [newRev, ...prev]);
   };
 
-  // Backlogs
+  // BACKLOGS
   const addBacklog = (bl: Omit<Backlog, 'id'>) => {
-    const newBl: Backlog = { ...bl, id: 'bl-' + Date.now() };
-    setBacklogs(prev => [...prev, newBl]);
+    const newBL: Backlog = {
+      ...bl,
+      id: `bl_${Date.now()}`
+    };
+    setBacklogs(prev => [...prev, newBL]);
   };
 
   const updateBacklog = (id: string, updates: Partial<Backlog>) => {
     setBacklogs(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
   };
 
-  const deleteBacklog = (id: string) => setBacklogs(prev => prev.filter(b => b.id !== id));
+  const deleteBacklog = (id: string) => {
+    setBacklogs(prev => prev.filter(b => b.id !== id));
+  };
 
-  // Quiz
+  // QUIZ RESULTS
   const saveQuizResult = (res: Omit<QuizResult, 'id' | 'date'>) => {
     const newRes: QuizResult = {
       ...res,
-      id: 'quiz-' + Date.now(),
+      id: `quiz_${Date.now()}`,
       date: new Date().toISOString()
     };
     setQuizResults(prev => [newRes, ...prev]);
   };
 
+  // RESTORE
   const restoreAllData = (data: any) => {
     if (data.subjects) setSubjects(data.subjects);
     if (data.tasks) setTasks(data.tasks);
@@ -394,6 +458,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider
       value={{
+        userId: currentUserId,
         subjects,
         tasks,
         sessions,
@@ -433,15 +498,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         restoreAllData
       }}
     >
-      <div className={theme === 'dark' ? 'dark' : ''}>
-        {children}
-      </div>
+      {children}
     </AppContext.Provider>
   );
 };
 
 export const useApp = () => {
   const context = useContext(AppContext);
-  if (!context) throw new Error('useApp must be used within AppProvider');
+  if (!context) {
+    throw new Error('useApp must be used within an AppProvider');
+  }
   return context;
 };

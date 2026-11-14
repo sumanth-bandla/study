@@ -115,3 +115,35 @@ export interface QuizResult {
   total: number;
   date: string;
 }
+
+export interface PeerStudyUser {
+  id: string;
+  name: string;
+  avatarColor: string;
+  currentSubject: string;
+  status: 'studying' | 'break' | 'idle';
+  isTimerRunning: boolean;
+  joinedAt: string;
+  lastActive: string;
+}
+
+export interface LiveChatMessage {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar: string;
+  text: string;
+  subjectTag?: string;
+  timestamp: string;
+}
+
+export interface SharedStudyRoom {
+  roomId: string;
+  roomName: string;
+  hostName: string;
+  subjectFocus: string;
+  pomodoroMinutes: number;
+  breakMinutes: number;
+  isActive: boolean;
+  participants: PeerStudyUser[];
+}
